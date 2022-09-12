@@ -170,6 +170,7 @@ class GuessTheWordGame {
 		PLAY_AGAIN_BTN.classList.add("hide");
 		GUESS_BTN.classList.remove("hide");
 		FORM_CONTAINER_CLASS.classList.remove("hide");
+		GUESSED_LETTERS_CLASS.innerHTML = '';
 		this.render();
 	}
 }
