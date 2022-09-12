@@ -18,7 +18,7 @@ const GUESSED_LETTERS_CLASS = document.querySelector(".guessed-letters");
 const GUESS_BTN = document.querySelector("button.guess");
 const GUESS_INPUT_CLASS = document.querySelector("input.letter");
 const ALREADY_GUESSED_CLASS = document.querySelector(".already-guessed");
-const PLAY_AGAIN_BTN = document.querySelector(".play-again");
+const PLAY_AGAIN_BTN = document.querySelector("button.play-again");
 const FORM_CONTAINER_CLASS = document.querySelector(".form-container");
 
 let SELECTED_WORD = '';
