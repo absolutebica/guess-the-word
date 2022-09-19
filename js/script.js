@@ -1,179 +1,279 @@
-const WORD_LIST = [
-	"banish",
-	"brave",
-	"front",
-	"convulsion",
-	"bland",
-	"cool",
-	"prove",
-	"tournament",
-	"recovery",
-	"copper"
-  ];
-  
-const MESSAGE_CLASS = document.querySelector(".message");
-const WIP_CLASS = document.querySelector(".word-in-progress");
-const GUESSES_REMAINING_CLASS = document.querySelector(".remaining");
-const GUESSED_LETTERS_CLASS = document.querySelector(".guessed-letters");
-const GUESS_BTN = document.querySelector("button.guess");
-const GUESS_INPUT_CLASS = document.querySelector("input.letter");
-const ALREADY_GUESSED_CLASS = document.querySelector(".already-guessed");
-const PLAY_AGAIN_BTN = document.querySelector("button.play-again");
-const FORM_CONTAINER_CLASS = document.querySelector(".form-container");
+// Element Classes
+const MESSAGE_CLASS = ".message";
+const WIP_CLASS = ".word-in-progress";
+const GUESSES_REMAINING_CLASS = ".remaining";
+const GUESSED_LETTERS_CLASS = ".guessed-letters";
+const ALREADY_GUESSED_CLASS = ".already-guessed";
+const FORM_CONTAINER_CLASS = ".form-container";
+const GUESS_INPUT_CLASS = ".input-letter";
+const GUESS_BTN = ".guess";
+const PLAY_AGAIN_BTN = ".play-again";
 
-let SELECTED_WORD = '';
-let GUESSES_LIMIT = 6;
+// Api
+const WordAPI = 'https://random-word-api.herokuapp.com/word';
 
-class GuessTheWordGame {
-	constructor(name) {
-		this.name = name;
-		this.selectedWord = SELECTED_WORD;
-		this.guessesLimit = GUESSES_LIMIT;
-		this.wrongGuesses = [];
-		this.correctGuesses = [];
+// Messages
+const SUCCESS_MESSAGE = "I can't believe you won. Great job Einstein!";
+const FAIL_MESSAGE = "Sorry! No soup for you!"
+
+const SELECTED_WORD = '';
+const GUESSES_LIMIT = 6;
+
+const TEMPLATE = `<p class="message"></p>
+<span class="loader hide"></span>
+<p class="word-in-progress"></p>
+<p class="remaining"></p>
+<ul class="guessed-letters"></ul>
+<div class="form-container">
+    <label for="letter">Type one letter:</label>
+    <input type="text" name="letter" class="input-letter" maxlength="1" />
+</div>
+<div class="already-guessed hide">Letter already guessed</div>
+<div class="form-element button-element">
+    <button class="guess">Guess!</button>
+</div>
+<button class="play-again hide">Play Again!</button>`;
+
+class WordGame {
+	#el;
+    #name;
+	#selectedWord;
+	#selectedWordLetters;
+	#guessesLimit;
+	#wrongGuesses;
+
+	constructor(container, name) {
+		this.#el = container ? container : document.createElement("div");
+		this.#name = name;
+		this.#selectedWord = SELECTED_WORD;
+		this.#guessesLimit = GUESSES_LIMIT;
+		this.#wrongGuesses = [];
+		this.#selectedWordLetters = [];
+	}
+
+	#template() {
+		this.#el.classList.add("game-container");
+		this.#el.innerHTML = TEMPLATE;
 	}
 
 	render() {
-		MESSAGE_CLASS.innerHTML = `${this.name}, welcome to Guess the Word`;
-		this.selectedWord = this.selectRandomWord();
-		this.buildWordHTML();
-		this.initialRemainingGuesses()
-		this.events();
-		this.setInputFocus();
+		this.#template();
+		this.#newGame();
+		this.#events();
+		this.#getElements().messageEl.innerHTML = `${this.#name}, welcome to Guess the Word`;
 	}
 
-	events() {
-		GUESS_BTN.addEventListener("click", this.checkInputGuess.bind(this));
-		PLAY_AGAIN_BTN.addEventListener("click", this.startOver.bind(this));
-		GUESS_INPUT_CLASS.addEventListener("keypress", this.onGuessInput);
-		document.addEventListener("keydown", this.onEnterKey.bind(this));
+	#events() {
+		const $guessBtn = this.#getElements().guessBtnEl;
+		const $playBtn = this.#getElements().playBtnEl;
+		const $guessInput = this.#getElements().guessInputEl;
+		$guessBtn.addEventListener("click", () => this.#checkLetter());
+		$playBtn.addEventListener("click", () => this.#newGame());
+		$guessInput.addEventListener("keypress", (event) => this.#validateInput(event));
+		$guessInput.addEventListener("keydown", event => this.#onEnterKey(event));
 	}
 
-	checkInputGuess(event) {
-		const letter = GUESS_INPUT_CLASS.value;
-		if (letter?.length && this.guessesLimit) {
-			this.testLetterInWord(letter);
-			GUESS_INPUT_CLASS.value = "";
-			this.setInputFocus();
-		}
-
-	}
-
-	onGuessInput(event) {
+	#validateInput(event){
 		const isValid = /^[a-zA-Z]+$/.test(event.key);
-
+	
 		if (!isValid) {
 			event.preventDefault();
 			return false;
 		}
 	}
-
-	onEnterKey(event) {
+	#onEnterKey(event) {
 		const isEnterKey = event.key === "Enter";
-		const isGuessInputValid = !!GUESS_INPUT_CLASS.value;
+		const isGuessInputValid = !!this.#getInputValue();
 		if (isEnterKey && isGuessInputValid) {
-			this.checkInputGuess();
+			this.#checkLetter();
 		}
 	}
 
-	testLetterInWord(letter) {
-		const hasMatch = this.selectedWord.match(letter);
-		const allGuesses = [...this.correctGuesses, ...this.wrongGuesses];
-		const hasBeenGuessed = !!allGuesses.find(guess => guess.toLowerCase() === letter.toLowerCase());
-		if (!hasBeenGuessed) {
-			ALREADY_GUESSED_CLASS.classList.add("hide");
-			if (hasMatch) {
-				this.correctGuesses.push(letter);
-				this.updateCorrectLetters();
-			} else {
-				this.guessesLimit--;
-				this.wrongGuesses.push(letter);
-				this.updateIncorrectLetters();
-			}
+	#getElement(querySelector) {
+		if (querySelector) {
+			return this.#el.querySelector(querySelector);
+		}
+	}
+
+	#getElements() {
+		return {
+			guessBtnEl: this.#getElement(GUESS_BTN),
+			playBtnEl: this.#getElement(PLAY_AGAIN_BTN),
+			guessInputEl: this.#getElement(GUESS_INPUT_CLASS),
+			messageEl: this.#getElement(MESSAGE_CLASS),
+			formContainerEl : this.#getElement(FORM_CONTAINER_CLASS),
+			guessLettersEl: this.#getElement(GUESSED_LETTERS_CLASS),
+			alreadyGuessedEl: this.#getElement(ALREADY_GUESSED_CLASS),
+			wordInProgressEl: this.#getElement(WIP_CLASS),
+			guessesRemainingEl: this.#getElement(GUESSES_REMAINING_CLASS),
+			loaderEl: this.#getElement(".loader")
+		}
+	}
+
+    #newGame() {
+		this.#resetGame();
+		this.#setupWord();
+		this.#setInputFocus();
+		this.#getElements().messageEl.innerHTML = `${this.#name}, let's do it again!`;
+	}
+
+    #resetGame() {
+		this.#wrongGuesses = [];
+		this.#guessesLimit = GUESSES_LIMIT;
+		this.#selectedWordLetters = [];
+		this.#selectedWord = SELECTED_WORD;
+
+		this.#getElements().playBtnEl.classList.add("hide");
+		this.#getElements().guessBtnEl.classList.remove("hide");
+		this.#getElements().formContainerEl.classList.remove("hide");
+		this.#getElements().guessLettersEl.innerHTML = '';
+	}
+
+    #setupWord() {
+		this.#getElements().loaderEl.classList.remove("hide");
+		this.#fetchRandomWord().then((word) => {
+			this.#getElements().loaderEl.classList.add("hide");
+			this.#selectedWord = word;
+			this.#setInitialRemainingGuesses();
+			this.#buildWordMask();
+			this.#updateRemainingGuessesMessage();
+
+			console.warn(`Shhhh the word is ${word}`);
+		});
+	}
+
+	#getInputValue() {
+		return this.#getElements().guessInputEl.value;
+	}
+
+	#checkLetter() {
+		const letter = this.#getInputValue();
+		if (letter?.length && this.#guessesLimit) {
+			this.#testLetterInWord(letter);
+			this.#getElements().guessInputEl.value = "";
+			this.#setInputFocus();
+		}
+	}
+
+    #setInputFocus() {
+		this.#getElements().guessInputEl.focus();
+	}
+
+	#testLetterInWord(letter) {
+		const regexp = new RegExp(letter, "g");
+		const selectedWordletterMatchesCount = (this.#selectedWord.match(regexp) || []).length;
+		const correctLetterGuessCount = this.#selectedWordLetters.filter(wordLetter => {
+			return (wordLetter.letter.toLowerCase() === letter.toLowerCase())
+			&& wordLetter.used
+			}).length;
+
+		const hasWrongMatch = !!this.#wrongGuesses.filter(guess => guess.toLowerCase() === letter.toLowerCase()).length;
+
+		if (hasWrongMatch || (selectedWordletterMatchesCount && correctLetterGuessCount >= selectedWordletterMatchesCount)) {
+			this.#getElements().alreadyGuessedEl.classList.remove("hide");
 		} else {
-			ALREADY_GUESSED_CLASS.classList.remove("hide");
+			if (selectedWordletterMatchesCount) {
+
+				this.#updateCorrectLetter(letter);
+				this.#checkIfWinner();
+			} else {
+				this.#guessesLimit--;
+				this.#wrongGuesses.push(letter);
+				this.#updateIncorrectLetters();
+				this.#updateRemainingGuessesMessage();
+			}
+
+			this.#getElements().alreadyGuessedEl.classList.add("hide");
 		}
-		
-		this.updateRemainingGuessesMessage();
 	}
 
-	updateCorrectLetters() {
-		this.correctGuesses.forEach(letter => {
-			const letterPosition = this.selectedWord.indexOf(letter);
-			const letterElements = WIP_CLASS.children;
-			if (letterPosition > -1) {
+	#updateCorrectLetter(letter) {
+			const findValidLetter = this.#selectedWordLetters.find(wordLetter => {
+				return wordLetter.letter.toLowerCase() === letter.toLowerCase()
+				&& !wordLetter.used;
+			});
+
+			const letterPosition = findValidLetter?.index ?? -1;
+			const letterElements = this.#getElements().wordInProgressEl.children;
+			if (letterPosition > -1 && findValidLetter) {
 				letterElements[letterPosition].innerHTML = letter;
 				letterElements[letterPosition].classList.remove("invalid-guess");
+				findValidLetter.used = true;
 			}
-		})
 	}
 
-	updateIncorrectLetters() {
-		GUESSED_LETTERS_CLASS.innerHTML = '';
-		this.wrongGuesses.forEach(letter => {
+	#updateIncorrectLetters() {
+		this.#getElements().guessLettersEl.innerHTML = '';
+		this.#wrongGuesses.forEach(letter => {
 			const incorrectLetterElement = document.createElement('span');
 			incorrectLetterElement.classList.add("incorrect-letter");
 			incorrectLetterElement.textContent = letter;
-			GUESSED_LETTERS_CLASS.append(incorrectLetterElement);
+			this.#getElements().guessLettersEl.append(incorrectLetterElement);
 		});
+
+		this.#getElements().guessLettersEl.classList.remove("hide");
 	}
 
-	initialRemainingGuesses() {
-		this.guessesLimit = this.selectedWord.length + 2;
-		this.updateRemainingGuessesMessage();
-	}
-
-	updateRemainingGuessesMessage() {
-		const guessMessage = this.guessesLimit ? `You have <span class="danger">${this.guessesLimit} incorrect guesses</span> remaining.` : 'Sorry! No soup for you!';
-		GUESSES_REMAINING_CLASS.innerHTML = guessMessage;
-		this.updateButtonStates();
-	}
-
-	updateButtonStates() {
-		if (!this.guessesLimit) {
-			PLAY_AGAIN_BTN.classList.remove("hide");
-			GUESS_BTN.classList.add("hide");
-			FORM_CONTAINER_CLASS.classList.add("hide");
-		}
-
-		GUESS_INPUT_CLASS.disabled = !this.guessesLimit;
-		GUESS_BTN.disabled = !this.guessesLimit;
-	}
-
-	selectRandomWord() {
-		const wordListLength = WORD_LIST.length;
-		const randomNumber = Math.floor(Math.random() * wordListLength);
-	  
-		return WORD_LIST[randomNumber];
-	}
-
-	buildWordHTML() {
-		const splitLetters = this.selectedWord.split('');
+	#buildWordMask() {
+		const splitLetters = this.#selectedWord.split('');
 		let HTML = '';
-		splitLetters.forEach(() => {
-		  	HTML += `<span class="letter invalid-guess">
+		splitLetters.forEach((letter, index) => {
+			this.#selectedWordLetters.push(
+				{
+					letter: letter,
+					index: index,
+					used: false
+				}
+			);
+			
+			HTML += `<span class="letter invalid-guess">
 			<span class="letter-char">&bull;</span>
 			</span>`;
 		});
-	  
-		WIP_CLASS.innerHTML = HTML;
+
+		this.#getElements().wordInProgressEl.innerHTML = HTML;
 	}
 
-	setInputFocus() {
-		GUESS_INPUT_CLASS.focus();
+	#setInitialRemainingGuesses() {
+		this.#guessesLimit = this.#selectedWord.length + 2;
 	}
 
-	startOver() {
-		this.wrongGuesses = [];
-		this.correctGuesses = [];
-		this.guessesLimit = GUESSES_LIMIT;
-		PLAY_AGAIN_BTN.classList.add("hide");
-		GUESS_BTN.classList.remove("hide");
-		FORM_CONTAINER_CLASS.classList.remove("hide");
-		GUESSED_LETTERS_CLASS.innerHTML = '';
-		this.render();
+	#updateRemainingGuessesMessage() {
+		const guessMessage = this.#guessesLimit ? `You have <span class="danger">${this.#guessesLimit} incorrect guesses</span> remaining.` : FAIL_MESSAGE;
+		this.#getElements().guessesRemainingEl.innerHTML = guessMessage;
+		this.#getElements().guessesRemainingEl.classList.remove("hide");
+		this.#updateButtonStates();
+	}
+
+	#updateButtonStates() {
+		if (!this.#guessesLimit) {
+			this.#getElements().playBtnEl.classList.remove("hide");
+			this.#getElements().guessBtnEl.classList.add("hide");
+			this.#getElements().formContainerEl.classList.add("hide");
+		}
+
+		this.#getElements().guessInputEl.disabled = !this.#guessesLimit;
+		this.#getElements().guessBtnEl.disabled = !this.#guessesLimit;
+	}
+
+	async #fetchRandomWord() {
+		return await fetch(WordAPI)
+			.then(response => response.json())
+			.then(wordData => wordData?.[0])
+	}
+
+	#checkIfWinner() {
+		// If no selected word letters are unused, we have a winner at this point
+		const isWinner = this.#guessesLimit && !this.#selectedWordLetters.filter(wordLetter => !wordLetter.used).length;
+		isWinner && this.#gameWon();
+	}
+
+	#gameWon() {
+		this.#getElements().playBtnEl.classList.remove("hide");
+		this.#getElements().guessBtnEl.classList.add("hide");
+		this.#getElements().formContainerEl.classList.add("hide");
+		this.#getElements().guessesRemainingEl.classList.add("hide");
+		this.#getElements().guessLettersEl.classList.add("hide");
+		this.#getElements().messageEl.innerHTML = SUCCESS_MESSAGE;
 	}
 }
-
-const newGame = new GuessTheWordGame("Bryan");
-newGame.render();
