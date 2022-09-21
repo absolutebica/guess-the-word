@@ -1,2 +1,2 @@
 # guess-the-word
-Guess the Word Game
+Guess the Word Game 
